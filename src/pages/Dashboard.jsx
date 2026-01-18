@@ -6,23 +6,21 @@ import toast from 'react-hot-toast';
 import { io } from "socket.io-client";
 
 // Socket connection
-const socket = io("http://localhost:3001");
+const socket = io(import.meta.env.VITE_API_URL);
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Log Viewer State
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState(null);
   const logsEndRef = useRef(null);
 
+  const [isDeploying, setIsDeploying] = useState(false);
+
   useEffect(() => {
     loadProjects();
-    
-    // Global listener for status updates
-    // In a real app, you'd listen to specific channels here too
     
     return () => {
       socket.off();
@@ -52,6 +50,7 @@ export default function Dashboard() {
     setActiveProjectId(project.id);
     setLogs([]);
     setShowLogs(true);
+    setIsDeploying(true);
     
     const toastId = toast.loading(`Starting deployment for ${project.name}...`);
 
@@ -77,6 +76,8 @@ export default function Dashboard() {
     } catch (e) {
         toast.error('Deploy request failed: ' + e.message, { id: toastId });
         setShowLogs(false);
+    } finally {
+      setIsDeploying(false);
     }
   };
 
@@ -143,9 +144,20 @@ export default function Dashboard() {
               <div className="flex gap-2 mt-auto pl-2">
                 <button 
                     onClick={() => handleDeploy(project)}
+                    disabled={isDeploying}
                     className="flex-1 btn btn-primary text-sm shadow-none"
                 >
-                  <PlayIcon className="w-4 h-4" /> Deploy
+                  {isDeploying ? (
+                    <span className='flex gap-1 items-center' onClick={() => setShowLogs(true)}>
+                      <PlayIcon className="w-4 h-4" />
+                      Show logs
+                    </span>
+                  ) : (
+                    <span className='flex gap-1 items-center'>
+                      <PlayIcon className="w-4 h-4" />
+                      Deploy
+                    </span>
+                  )}
                 </button>
                 <Link 
                     to={`/projects/${project.id}/edit`}
