@@ -15,9 +15,9 @@ export default {
         "surface-dark": "#1e1e21",
         "border-dark": "#2a2a2d",
         "terminal-bg": "#0d0d0f",
-        // Keep existing semantic aliases for compatibility
-        background: '#131315', // map to new background-dark
-        surface: '#1e1e21',    // map to new surface-dark
+        background: '#131315',
+        dark: '#131315',
+        surface: '#1e1e21',
         text: '#ffffff',
         textMuted: '#94a3b8',
         success: '#10b981',
@@ -26,7 +26,6 @@ export default {
       fontFamily: {
         "display": ["Space Grotesk", "sans-serif"],
         "body": ["Space Grotesk", "sans-serif"],
-        // Keep existing for compatibility if needed
         sans: ["Space Grotesk", "sans-serif"],
       },
       borderRadius: {

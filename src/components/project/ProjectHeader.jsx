@@ -1,7 +1,10 @@
 import clsx from 'clsx';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function ProjectHeader({ project, isDeploying, onDeploy }) {
+
+    const navigate = useNavigate();
+
   return (
     <header className="flex h-auto flex-col gap-4 border-b border-border-dark bg-surface-dark px-6 py-4 shrink-0">
         <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -47,6 +50,15 @@ export default function ProjectHeader({ project, isDeploying, onDeploy }) {
                 </div>
             </div>
             <div className="flex items-center gap-3">
+                {/* Back to projects */}
+                <button 
+                    onClick={() => navigate('/projects')}
+                    className="flex items-center justify-center rounded-lg px-4 py-2 text-sm font-bold transition-transform active:scale-95 shadow-lg"
+                >
+                    <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    Back to Projects
+                </button>
+                {/* Deploy button */}
                 <button 
                     onClick={onDeploy}
                     disabled={isDeploying}

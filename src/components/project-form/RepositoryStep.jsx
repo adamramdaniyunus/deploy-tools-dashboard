@@ -66,7 +66,7 @@ export default function RepositoryStep({ formData, handleChange, onSave, onDeplo
                 className="flex items-center gap-2 px-8 py-3 rounded-lg bg-primary hover:bg-primary-dark text-black text-sm font-bold shadow-[0_0_20px_rgba(0,230,203,0.3)] hover:shadow-[0_0_30px_rgba(0,230,203,0.5)] transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
-                {loading ? 'Deploying...' : 'Deploy Project'}
+                {loading ? 'Deploying...' : 'Save & Deploy'}
             </button>
         </div>
     </div>
