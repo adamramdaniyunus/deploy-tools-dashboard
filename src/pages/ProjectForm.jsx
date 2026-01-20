@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { projectService } from '../services/api';
 import toast from 'react-hot-toast';
+import { io } from "socket.io-client";
 import { useHeader } from '../context/HeaderContext';
-import WizardProgress from '../components/project-form/WizardProgress';
 import CredentialsStep from '../components/project-form/CredentialsStep';
 import ConfigurationStep from '../components/project-form/ConfigurationStep';
 import RepositoryStep from '../components/project-form/RepositoryStep';
 import TerminalPreview from '../components/project-form/TerminalPreview';
+
+// Socket connection
+const socket = io(import.meta.env.VITE_API_URL);
 
 export default function ProjectForm() {
   const navigate = useNavigate();
@@ -40,6 +43,7 @@ export default function ProjectForm() {
 
     // Server Setup
     setupType: 'full', // 'full' | 'app'
+    tools: [], // Array of selected tools
     installNginx: true,
     installDocker: true,
     installCertbot: false,
@@ -48,6 +52,29 @@ export default function ProjectForm() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [testLogs, setTestLogs] = useState([]);
+  const [deployLogs, setDeployLogs] = useState([]);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploymentProjectId, setDeploymentProjectId] = useState(null);
+
+  useEffect(() => {
+    // Socket listener for test logs
+    socket.on('log:test', (data) => {
+        setTestLogs(prev => [...prev, data]);
+    });
+
+    // Socket listener for deployment logs
+    socket.on('logs', (data) => {
+        setDeployLogs(prev => [...prev, data]);
+    });
+
+    return () => {
+        socket.off('log:test');
+        socket.off('logs');
+    };
+  }, []);
 
   useEffect(() => {
     if (isEditMode) {
@@ -67,13 +94,14 @@ export default function ProjectForm() {
                 <button 
                     onClick={() => navigate('/projects')}
                     className="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+                    disabled={isDeploying}
                 >
-                    Cancel Setup
+                    {isDeploying ? 'Deploying...' : 'Cancel Setup'}
                 </button>
             </div>
         </header>
       );
-  }, [isEditMode, navigate, setHeader]);
+  }, [isEditMode, navigate, setHeader, isDeploying]);
 
   const loadProject = async () => {
     const toastId = toast.loading('Loading project details...');
@@ -95,34 +123,114 @@ export default function ProjectForm() {
     }));
   };
 
+  const handleTestConnection = async () => {
+    if (!formData.host || !formData.username) {
+        toast.error('Please provide Host and Username');
+        return;
+    }
+
+    setTestingConnection(true);
+    setTestLogs([]); // Clear logs
+    const toastId = toast.loading('Testing connection...');
+    
+    try {
+        await projectService.testConnection({ 
+            ...formData, 
+            socketId: socket.id 
+        });
+        setIsConnected(true);
+        toast.success('Connection verified successfully!', { id: toastId });
+    } catch (error) {
+        console.error(error);
+        toast.error('Connection failed: ' + (error.response?.data?.error || error.message), { id: toastId });
+        setIsConnected(false);
+    } finally {
+        setTestingConnection(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e?.preventDefault();
     setLoading(true);
-    const toastId = toast.loading(isEditMode ? 'Updating project...' : 'Initiailzing deployment...');
+    setDeployLogs([]); // Clear deployment logs
+    const toastId = toast.loading(isEditMode ? 'Updating project...' : 'Creating project and starting deployment...');
     
     try {
+      let projectId = id;
+      
+      // Construct complete payload
+      const payload = {
+        ...formData
+      };
+
       if (isEditMode) {
-        await projectService.update(id, formData);
+        await projectService.update(id, payload);
         toast.success('Project updated successfully!', { id: toastId });
       } else {
-        await projectService.create(formData);
-        toast.success('Project created & deployed successfully!', { id: toastId });
+        // Create project
+        const response = await projectService.create(payload);
+        projectId = response.data.id;
+        setDeploymentProjectId(projectId);
+        toast.success('Project created! Starting deployment...', { id: toastId });
+        
+        // Start deployment immediately
+        setIsDeploying(true);
+        setIsConnected(true); // Show as connected during deployment
+        
+        // Listen to deployment logs for this specific project
+        const logChannel = `logs:${projectId}`;
+        socket.on(logChannel, (data) => {
+          setDeployLogs(prev => [...prev, data]);
+        });
+        
+        // Trigger deployment
+        await projectService.deploy(projectId);
+        
+        // Listen for deployment status
+        socket.on(`status:${projectId}`, (data) => {
+          if (data.status === 'success') {
+            toast.success('Deployment completed successfully!');
+            setIsDeploying(false);
+            setTimeout(() => navigate('/projects'), 2000);
+          } else if (data.status === 'failed') {
+            toast.error('Deployment failed!');
+            setIsDeploying(false);
+          }
+        });
       }
-      setTimeout(() => navigate('/projects'), 1000); 
+      
+      if (isEditMode) {
+        setTimeout(() => navigate('/projects'), 1000);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Failed to save project: ' + (error.response?.data?.error || error.message), { id: toastId });
+      setIsDeploying(false);
     } finally {
       setLoading(false);
     }
   };
 
+  const getStepStatus = () => {
+      const step1Valid = !!(formData.host && formData.username && (formData.password || formData.privateKey));
+      const step2Valid = !!(formData.type && formData.deployPath);
+      const step3Valid = !!(formData.repoUrl && formData.branch);
+
+      return [
+          { label: 'CREDENTIALS', valid: step1Valid },
+          { label: 'CONFIGURATION', valid: step2Valid },
+          { label: 'REPOSITORY', valid: step3Valid }
+      ];
+  };
+
+  const steps = getStepStatus();
+
   return (
     <div className="flex flex-col h-full bg-background-dark overflow-hidden relative">
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            <div className="mx-auto w-full">
+            <div className="mx-auto w-full max-w-[1600px] p-6 pb-20">
                 
-                <WizardProgress />
+                {/* <WizardProgress steps={steps} /> */}
 
                 <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
                     
@@ -132,6 +240,8 @@ export default function ProjectForm() {
                         <CredentialsStep 
                             formData={formData} 
                             handleChange={handleChange} 
+                            onTestConnection={handleTestConnection}
+                            testing={testingConnection}
                         />
 
                         <ConfigurationStep 
@@ -149,7 +259,11 @@ export default function ProjectForm() {
                     </div>
 
                     {/* Preview Section */}
-                    <TerminalPreview />
+                    <TerminalPreview 
+                      logs={isDeploying ? deployLogs : testLogs} 
+                      isConnected={isConnected}
+                      isDeploying={isDeploying}
+                    />
                     
                 </div>
             </div>

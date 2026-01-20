@@ -1,4 +1,8 @@
-export default function CredentialsStep({ formData, handleChange }) {
+import clsx from 'clsx';
+import { useState } from 'react';
+
+export default function CredentialsStep({ formData, handleChange, onTestConnection, testing }) {
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
         <div className="flex items-center justify-between mb-4">
@@ -52,7 +56,7 @@ export default function CredentialsStep({ formData, handleChange }) {
                         value={formData.privateKey || ''}
                         onChange={handleChange}
                         className="w-full bg-background-dark border border-border-dark rounded-lg py-2.5 pl-10 pr-4 text-sm font-mono text-slate-300 focus:outline-none focus:ring-0 transition-colors placeholder:text-slate-600 resize-none custom-scrollbar" 
-                        placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----&#10;&#10;OR Enter your Password here" 
+                        placeholder="Enter your Private Key here" 
                         rows="5"
                     ></textarea>
                 </div>
@@ -61,10 +65,17 @@ export default function CredentialsStep({ formData, handleChange }) {
                     Key/Password is encrypted with AES-256 before storage.
                 </p>
             </div>
-            <div className="flex justify-end">
-                <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 transition-colors text-xs font-bold uppercase tracking-wide">
-                    <span className="material-symbols-outlined text-[18px]">network_check</span>
-                    Test Connection
+            <div className="flex justify-end w-full">
+                <button 
+                  type="button" 
+                  onClick={onTestConnection}
+                  disabled={testing}
+                  className="bg-surface-dark border border-border-dark hover:border-primary text-white p-2.5 rounded-lg transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                >
+                    <span className={clsx("material-symbols-outlined group-hover:text-emerald-400 transition-colors", testing && "animate-spin")}>
+                        {testing ? 'sync' : 'network_check'}
+                    </span>
+                    {testing ? 'Testing...' : 'Test Connection'}
                 </button>
             </div>
         </div>
