@@ -10,10 +10,12 @@ import Register from './pages/Register';
 import NotFound from './pages/NotFound';
 
 import { HeaderProvider } from './context/HeaderContext';
+import { UserProvider } from './context/UserContext';
 
 function App() {
   return (
     <Router>
+      <UserProvider>
       <HeaderProvider>
       <Toaster 
         position="top-right"
@@ -32,8 +34,8 @@ function App() {
 
         {/* Protected Routes */}
         <Route element={<Layout><Outlet /></Layout>}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/projects" element={<ProjectList />} />
+          <Route path="/" element={<ProjectList />} />
+          {/* <Route path="/projects" element={<ProjectList />} /> */}
           <Route path="/projects/new" element={<ProjectForm />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/projects/:id/edit" element={<ProjectForm />} />
@@ -43,6 +45,7 @@ function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       </HeaderProvider>
+      </UserProvider>
     </Router>
   );
 }

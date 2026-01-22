@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectService } from '../services/api';
 import toast from 'react-hot-toast';
 import { io } from "socket.io-client";
@@ -13,21 +14,44 @@ const socket = io(import.meta.env.VITE_API_URL);
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  const queryClient = useQueryClient();
   const { setHeader } = useHeader();
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
+  
   const [logs, setLogs] = useState([]);
   const [isDeploying, setIsDeploying] = useState(false);
-  
-  // Fake history for UI demo, in real app this would come from API
-  const [history] = useState([
-      { id: '1', hash: '8a2f9c', message: 'Fix: production API endpoint cors issue', time: '2m ago', status: 'success', duration: '45s' },
-      { id: '2', hash: '7b1e4d', message: 'Feat: add new payment gateway', time: '1h ago', status: 'failed', duration: '12s' },
-      { id: '3', hash: '5c9a2f', message: 'Chore: update dependencies', time: '4h ago', status: 'success', duration: '52s' },
-  ]);
+  const [isConnected, setIsConnected] = useState(socket.connected); 
+
+  const { data: project, isLoading: projectLoading, isError: projectError } = useQuery({
+    queryKey: ['project', id],
+    queryFn: () => projectService.getById(id).then(res => res.data),
+    enabled: !!id
+  });
+
+  const { data: history = [] } = useQuery({
+    queryKey: ['project-history', id],
+    queryFn: () => projectService.getHistory(id).then(res => res.data),
+    enabled: !!id
+  });
 
   useEffect(() => {
-    loadProject();
+    function onConnect() {
+      setIsConnected(true);
+    }
+    function onDisconnect() {
+      setIsConnected(false);
+    }
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+
+    if (socket.connected) {
+        setIsConnected(true);
+    }
+
+    // Trigger terminal check only once when mounting and id valid
+    if (id) {
+       checkTerminal();
+    }
     
     // Connect to project specific log channel
     const channel = `logs:${id}`;
@@ -39,20 +63,26 @@ export default function ProjectDetail() {
         if (data.status === 'success') {
             toast.success('Deployment completed successfully!');
             setIsDeploying(false);
-            loadProject(); // Refresh status
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries({ queryKey: ['project', id] });
+            queryClient.invalidateQueries({ queryKey: ['project-history', id] });
         } else if (data.status === 'failed') {
             toast.error('Deployment failed!');
             setIsDeploying(false);
-            loadProject();
+            queryClient.invalidateQueries({ queryKey: ['project', id] });
+            queryClient.invalidateQueries({ queryKey: ['project-history', id] });
         }
     });
 
     return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.off(channel);
       socket.off(`status:${id}`);
     };
-  }, [id]);
+  }, [id, queryClient]);
 
+  // Header update
   useEffect(() => {
     if (project) {
         setHeader(
@@ -65,23 +95,21 @@ export default function ProjectDetail() {
     }
   }, [project, isDeploying, setHeader]);
 
-  const loadProject = async () => {
-    try {
-      const { data } = await projectService.getById(id);
-      setProject(data);
-    } catch (error) {
-      console.error('Failed to load project:', error);
-      toast.error('Failed to load project details');
-    } finally {
-      setLoading(false);
-    }
+  // --- Actions ---
+  const checkTerminal = async () => {
+      try {
+          setLogs([]);
+          await projectService.getSystemInfo(id);
+      } catch (error) {
+          console.error('Failed to check terminal:', error);
+      }
   };
 
   const handleDeploy = async () => {
     if (!project) return;
     
     setIsDeploying(true);
-    setLogs([]); // Clear previous logs on new deploy
+    setLogs([]); 
     const toastId = toast.loading(`Starting deployment...`);
 
     try {
@@ -93,11 +121,21 @@ export default function ProjectDetail() {
     }
   };
 
-  if (loading) {
+  const handleCommand = async (cmd) => {
+      if (!project) return;
+      try {
+          await projectService.executeCommand(project.id, cmd);
+      } catch (error) {
+          console.error("Command failed", error);
+          toast.error("Failed to send command");
+      }
+  };
+
+  if (projectLoading) {
      return <div className="text-center text-slate-500 mt-20">Loading...</div>;
   }
 
-  if (!project) {
+  if (projectError || !project) {
       return <div className="text-center text-slate-500 mt-20">Project not found</div>;
   }
 
@@ -108,6 +146,8 @@ export default function ProjectDetail() {
         <Terminal 
           logs={logs} 
           isDeploying={isDeploying} 
+          isConnected={isConnected}
+          onCommand={handleCommand}
         />
     </div>
   );

@@ -8,7 +8,7 @@ export default function Layout({ children }) {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: 'dashboard' },
-    { name: 'Projects', href: '/projects', icon: 'folder_open' },
+    // { name: 'Projects', href: '/projects', icon: 'folder_open' },
     { name: 'Nodes', href: '/nodes', icon: 'dns' },
     { name: 'Activity Logs', href: '/activity', icon: 'article' },
     { name: 'Settings', href: '/settings', icon: 'settings' },

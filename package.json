@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@tanstack/react-query": "^5.90.19",
     "abc": "^0.6.1",
     "autoprefixer": "^10.4.17",
     "axios": "^1.13.2",

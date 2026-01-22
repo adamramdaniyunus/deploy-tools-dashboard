@@ -1,31 +1,27 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { projectService } from '../services/api';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import Card from '../components/Card';
 
 export default function ProjectList() {
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, active, failed, deploying
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  const { data: projects = [], isLoading, isError, error } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectService.getAll().then(res => res.data),
+    staleTime: 60 * 1000
+  });
 
-  const loadProjects = async () => {
-    try {
-      const { data } = await projectService.getAll();
-      setProjects(data);
-    } catch (error) {
+  useEffect(() => {
+    if (isError) {
       console.error('Failed to load projects:', error);
       toast.error('Failed to load projects');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [isError, error]);
 
   const filteredProjects = projects.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -169,7 +165,7 @@ export default function ProjectList() {
 
         {/* Grid List */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {loading ? (
+          {isLoading ? (
              <div className="col-span-full py-12 text-center text-slate-500">
                  Loading projects...
              </div>

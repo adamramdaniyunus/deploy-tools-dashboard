@@ -11,6 +11,9 @@ export const projectService = {
   update: (id, data) => api.put(`/projects/${id}`, data),
   delete: (id) => api.delete(`/projects/${id}`),
   deploy: (id) => api.post(`/projects/${id}/deploy`),
+  getHistory: (id) => api.get(`/projects/${id}/history`),
+  getSystemInfo: (id) => api.post(`/projects/${id}/terminal-check`),
+  executeCommand: (id, command) => api.post(`/projects/${id}/command`, { command }),
   testConnection: (data) => api.post('/test-connection', data),
 };
 
@@ -36,4 +39,9 @@ export const organizationsService = {
   create: (data) => api.post('/organizations', data),
   update: (id, data) => api.put(`/organizations/${id}`, data),
   delete: (id) => api.delete(`/organizations/${id}`),
+};
+
+export const authService = {
+  login: (email, password) => api.post('/users/login', { email, password }),
+  getUser: (token) => api.get('/users/me', { headers: { Authorization: `Bearer ${token}` } }),
 };
